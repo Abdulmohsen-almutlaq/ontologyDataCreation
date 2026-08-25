@@ -1,4 +1,5 @@
 import type { LLMConfig } from '../config/Config';
+import { deepseekProvider } from './DeepSeekProvider';
 import { LLMError, type LLMClient } from './LLMClient';
 import type { LLMProvider } from './LLMProvider';
 import { mockProvider } from './MockProvider';
@@ -45,5 +46,6 @@ export function defaultRegistry(): LLMRegistry {
   return new LLMRegistry()
     .register(ollamaProvider)
     .register(openAICompatibleProvider)
+    .register(deepseekProvider)
     .register(mockProvider);
 }

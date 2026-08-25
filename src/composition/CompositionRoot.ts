@@ -112,6 +112,11 @@ export function composeHarness(options: CompositionOptions): HarnessComponents {
         { prompt, missing },
         'Prompt references variables the harness does not supply'
       ),
+    // Every call site is structural except CompletionAgent's prose summary -
+    // see the "completion" label. Unset by default: no behaviour change
+    // unless LLM_COMPLETION_TEMPERATURE is explicitly set.
+    temperatureFor: (label) =>
+      label === 'completion' ? config.llm.completionTemperature : undefined,
   };
 
   return {

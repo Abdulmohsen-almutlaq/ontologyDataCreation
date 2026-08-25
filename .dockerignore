@@ -5,3 +5,6 @@ dist-tests
 .env
 *.log
 coverage
+# run artefacts and the knowledge graph are outputs, never build inputs
+out
+graphify-out

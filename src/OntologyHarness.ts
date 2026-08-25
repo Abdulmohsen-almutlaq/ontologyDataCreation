@@ -25,7 +25,7 @@ import type { LLMRegistry } from './llm/LLMRegistry';
 import { nodeCount } from './ontology/Ontology';
 import { FixtureObserver } from './observation/FixtureObserver';
 import { ObservationExecutor } from './observation/ObservationExecutor';
-import { PostgreSQLObserver } from './observation/PostgreSQLObserver';
+import { defaultSourceRegistry } from './observation/SourceRegistry';
 import type { DatabaseObserver } from './observation/Observation';
 import type { Trace } from './trace/Trace';
 
@@ -54,6 +54,30 @@ export interface OntologyResult {
   elapsedMs: number;
 }
 
+/**
+ * Live checkpoints of a run, for a caller that wants to show progress as it
+ * happens rather than wait for the finished OntologyResult. Carries the same
+ * facts the structured logger already records - this is a second, additive
+ * notification path, not a replacement: logs stay for machines, this is for
+ * a human watching a terminal.
+ */
+export type ProgressEvent =
+  | { type: 'observing' }
+  | { type: 'discovery'; entities: number; depth: number }
+  | {
+      type: 'decision';
+      iteration: number;
+      decision: DepthDecision['decision'];
+      targetNodes?: string[];
+      reason: string;
+      expectedValue: number;
+      complexityCost: number;
+    }
+  | { type: 'stalled' }
+  | { type: 'limit'; reason: TerminationReason }
+  | { type: 'assessing' }
+  | { type: 'error'; message: string };
+
 export interface HarnessOptions {
   config: Config;
   logger: Logger;
@@ -64,6 +88,7 @@ export interface HarnessOptions {
   llmGapAnalysis?: boolean;
   semanticValidation?: boolean;
   completionAssessment?: boolean;
+  onProgress?: (event: ProgressEvent) => void;
 }
 
 /**
@@ -89,6 +114,13 @@ export class OntologyHarness {
   }
 
   /** Builds the source described by config. */
+  /**
+   * "postgres" in SOURCE_KIND means "connect via URL" - the scheme in
+   * DATABASE_URL picks the driver (src/observation/SourceRegistry.ts), the
+   * same registry the interactive shell's `connect` command resolves against.
+   * A fixture source stays a directory, never a URL: see connection.ts for
+   * why a `fixture://` scheme was rejected.
+   */
   static sourceFromConfig(config: Config): DataSource {
     if (config.source.kind === 'fixture') {
       return {
@@ -97,12 +129,14 @@ export class OntologyHarness {
         defaultSchema: config.source.schema,
       };
     }
+    const { observer, driver } = defaultSourceRegistry().createObserver(
+      config.source.databaseUrl!,
+      config.source.schema
+    );
     return {
-      name: 'postgres',
-      observer: new PostgreSQLObserver({
-        databaseUrl: config.source.databaseUrl!,
-        schema: config.source.schema,
-      }),
+      name: driver.name,
+      description: driver.note,
+      observer,
       defaultSchema: config.source.schema,
     };
   }
@@ -132,6 +166,7 @@ export class OntologyHarness {
     try {
       /* ------------------------------------------------ OBSERVE (seed) */
       state.status = 'OBSERVING';
+      this.options.onProgress?.({ type: 'observing' });
       await source.observer.connect();
       const overview = await observations.schemaOverview(0);
       state.observations.push(overview);
@@ -142,8 +177,20 @@ export class OntologyHarness {
 
       /* ---------------------------------------------------- DISCOVER */
       state.status = 'DISCOVERING';
+      // Rendered once, here, rather than left as a raw string: discovery.md
+      // gets the framing that tells the model to verify it, not the user's
+      // text unguarded. Omitted entirely when unset - the prompt falls back
+      // to a neutral placeholder (context.ts), not an empty section.
+      const expectedSchema = config.source.expectedSchema
+        ? (
+            await this.parts.prompts.render('ontology/expected-schema', {
+              EXPECTED_SCHEMA_TEXT: config.source.expectedSchema,
+            })
+          ).rendered
+        : undefined;
       const discovered = await this.parts.discovery.propose(state, {
         observations: [overview],
+        expectedSchema,
       });
       const seeded = this.parts.engine.apply(state.ontology, discovered.operations, {
         iteration: 0,
@@ -174,6 +221,11 @@ export class OntologyHarness {
         { entities: state.ontology.entities.length, depth: state.depth.globalDepth },
         'Initial discovery complete'
       );
+      this.options.onProgress?.({
+        type: 'discovery',
+        entities: state.ontology.entities.length,
+        depth: state.depth.globalDepth,
+      });
 
       /* --------------------------------------------------- MAIN LOOP */
       while (true) {
@@ -186,6 +238,7 @@ export class OntologyHarness {
         if (limit) {
           termination = limit;
           logger.warn({ limit }, 'Exploration stopped by a hard limit');
+          this.options.onProgress?.({ type: 'limit', reason: limit });
           break;
         }
 
@@ -230,6 +283,15 @@ export class OntologyHarness {
           },
           decision.reason
         );
+        this.options.onProgress?.({
+          type: 'decision',
+          iteration: state.iteration,
+          decision: decision.decision,
+          targetNodes: decision.targetNodes,
+          reason: decision.reason,
+          expectedValue: decision.expectedValue,
+          complexityCost: decision.complexityCost,
+        });
 
         if (decision.decision === 'STOP') {
           state.explorationHistory.push({
@@ -277,6 +339,7 @@ export class OntologyHarness {
         signatures.push(signature);
         if (stall) {
           logger.warn({ stall }, 'Exploration stalled');
+          this.options.onProgress?.({ type: 'stalled' });
           termination = 'STALLED';
           break;
         }
@@ -288,10 +351,12 @@ export class OntologyHarness {
         termination = err.reason;
         state.status = 'COMPLETED';
         logger.warn({ reason: err.reason }, err.message);
+        this.options.onProgress?.({ type: 'limit', reason: err.reason });
       } else {
         termination = 'ERROR';
         state.status = 'FAILED';
         logger.error({ err: (err as Error).message }, 'Harness run failed');
+        this.options.onProgress?.({ type: 'error', message: (err as Error).message });
         this.parts.trace.record({
           iteration: state.iteration,
           state: 'FAILED',
@@ -308,6 +373,7 @@ export class OntologyHarness {
     let completion: CompletionAssessment | undefined;
     if (state.status === 'COMPLETED' && (this.options.completionAssessment ?? true)) {
       try {
+        this.options.onProgress?.({ type: 'assessing' });
         completion = await this.parts.completionAgent.assess(state);
       } catch (err) {
         logger.warn(

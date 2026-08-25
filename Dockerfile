@@ -37,4 +37,6 @@ COPY --from=build /app/dist ./dist
 COPY prompts ./prompts
 COPY tests/fixtures ./tests/fixtures
 EXPOSE 3000
+# One run and exit. The interactive shell is opt-in and needs a terminal, so it
+# is never the default here: `docker compose run --rm cli` allocates one.
 CMD ["node", "dist/index.js"]

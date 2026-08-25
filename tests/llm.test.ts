@@ -7,6 +7,11 @@ import { MockClient, mockProvider } from '../src/llm/MockProvider';
 import { defaultRegistry } from '../src/llm/LLMRegistry';
 import { extractJson, StructuredGenerator } from '../src/llm/StructuredGenerator';
 import { PromptLoader } from '../src/prompts/PromptLoader';
+import { CompletionAgent } from '../src/agents/CompletionAgent';
+import type { AgentDeps } from '../src/agents/BaseAgent';
+import { DepthController } from '../src/agents/DepthController';
+import { createState } from '../src/exploration/ExplorationState';
+import { Trace } from '../src/trace/Trace';
 import { ROOT, testConfig } from './helpers';
 
 const limits = {
@@ -41,7 +46,12 @@ const Shape = z.object({ ok: z.boolean(), count: z.number().default(0) });
 describe('provider registry', () => {
   test('switching providers changes nothing but the client', () => {
     const registry = defaultRegistry();
-    assert.deepEqual(registry.names(), ['mock', 'ollama', 'openai-compatible']);
+    assert.deepEqual(registry.names(), [
+      'deepseek',
+      'mock',
+      'ollama',
+      'openai-compatible',
+    ]);
 
     const ollama = registry.createClient(
       testConfig('stop-early', {
@@ -70,7 +80,67 @@ describe('provider registry', () => {
   test('an unknown provider is rejected with the registered names', () => {
     assert.throws(
       () => defaultRegistry().get('gemini'),
-      /Unknown LLM provider "gemini".*mock, ollama, openai-compatible/s
+      /Unknown LLM provider "gemini".*deepseek, mock, ollama, openai-compatible/s
+    );
+  });
+
+  test('deepseek supplies its own base url', () => {
+    // The point of a named provider over raw openai-compatible: no endpoint to
+    // remember, and a missing key is refused rather than discovered as a 401.
+    const client = defaultRegistry().createClient(
+      testConfig('stop-early', {
+        LLM_PROVIDER: 'deepseek',
+        LLM_MODEL: 'deepseek-v4-pro',
+        LLM_API_KEY: 'sk-test',
+      }).llm
+    );
+    assert.equal(client.model, 'deepseek-v4-pro');
+    assert.equal(client.capabilities.jsonSchema, false, 'json_schema is not documented');
+    assert.equal(client.capabilities.vision, false);
+    assert.equal(client.capabilities.maxContextTokens, 1_000_000);
+  });
+
+  test('deepseek endpoint, vision list and context window all come from env', () => {
+    // No vendor fact is compiled in: if DeepSeek moves the endpoint, renames a
+    // vision model or changes the window, none of it is a code change.
+    const config = testConfig('stop-early', {
+      LLM_PROVIDER: 'deepseek',
+      LLM_MODEL: 'some-future-model',
+      LLM_API_KEY: 'sk-test',
+      DEEPSEEK_BASE_URL: 'https://proxy.internal/deepseek',
+      DEEPSEEK_VISION_MODELS: 'some-future-model, another-one',
+      DEEPSEEK_MAX_CONTEXT_TOKENS: '2000000',
+    });
+    assert.equal(config.llm.deepseek.baseUrl, 'https://proxy.internal/deepseek');
+    assert.deepEqual(config.llm.deepseek.visionModels, [
+      'some-future-model',
+      'another-one',
+    ]);
+
+    const client = defaultRegistry().createClient(config.llm);
+    assert.equal(client.capabilities.vision, true, 'vision list is env-driven');
+    assert.equal(client.capabilities.maxContextTokens, 2_000_000);
+  });
+
+  test('deepseek claims vision only for the vision model', () => {
+    const client = defaultRegistry().createClient(
+      testConfig('stop-early', {
+        LLM_PROVIDER: 'deepseek',
+        LLM_MODEL: 'deepseek-v4-flash-vision-exp',
+        LLM_API_KEY: 'sk-test',
+      }).llm
+    );
+    assert.equal(client.capabilities.vision, true);
+  });
+
+  test('deepseek without a key fails in config, not mid-run', () => {
+    assert.throws(
+      () =>
+        testConfig('stop-early', {
+          LLM_PROVIDER: 'deepseek',
+          LLM_MODEL: 'deepseek-v4-pro',
+        }),
+      /LLM_API_KEY is required when LLM_PROVIDER=deepseek/
     );
   });
 
@@ -180,5 +250,61 @@ describe('structured generation', () => {
       llm.generate({ label: 't', prompt: 'x', schema: Shape, schemaName: 'Shape' }),
       /connection refused/
     );
+  });
+});
+
+describe('per-call-site temperature', () => {
+  function deps(temperatureFor: AgentDeps['temperatureFor']) {
+    const budget = new Budget(limits);
+    const client = new MockClient(
+      {
+        entries: [
+          { label: 'completion', response: { sufficient: true } },
+          { label: 'depth-decision', response: { decision: 'STOP', reason: 'done' } },
+        ],
+      },
+      'scripted',
+      { structuredOutput: false, jsonSchema: false, toolCalling: false, streaming: false, vision: false }
+    );
+    const promptLoader = new PromptLoader({ dir: path.join(ROOT, 'prompts'), version: 'v1' });
+    const llm = new StructuredGenerator({
+      client,
+      budget,
+      promptLoader,
+      maxCorrectionRetries: 0,
+    });
+    const agentDeps: AgentDeps = {
+      llm,
+      prompts: promptLoader,
+      trace: new Trace('test-run'),
+      temperatureFor,
+    };
+    return { agentDeps, client };
+  }
+
+  test("BaseAgent forwards temperatureFor's answer for the calling label only", async () => {
+    const { agentDeps, client } = deps((label) => (label === 'completion' ? 0.4 : undefined));
+
+    const state = createState('test-run', 'shop');
+    await new CompletionAgent(agentDeps).assess(state);
+    await new DepthController(agentDeps).decide({
+      state,
+      limits,
+      defaultSchema: 'public',
+    });
+
+    const completionCall = client.calls.find((c) => c.label === 'completion');
+    const depthCall = client.calls.find((c) => c.label === 'depth-decision');
+    assert.equal(completionCall?.temperature, 0.4, 'the one overridden label carries it');
+    assert.equal(depthCall?.temperature, undefined, 'every other label is untouched');
+  });
+
+  test('with no temperatureFor, every call carries no temperature override', async () => {
+    const { agentDeps, client } = deps(undefined);
+
+    const state = createState('test-run', 'shop');
+    await new CompletionAgent(agentDeps).assess(state);
+
+    assert.equal(client.calls[0]?.temperature, undefined);
   });
 });

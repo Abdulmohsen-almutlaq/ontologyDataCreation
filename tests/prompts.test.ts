@@ -55,6 +55,7 @@ describe('prompt loader', () => {
 
     for (const name of await loader.list()) {
       if (name === 'system/correction') continue; // rendered by the LLM layer
+      if (name === 'ontology/expected-schema') continue; // rendered directly by OntologyHarness.run(), not through buildContext
       const rendered = await loader.render(name, context);
       assert.deepEqual(
         rendered.missingVariables,

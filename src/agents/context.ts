@@ -17,6 +17,8 @@ export interface ContextOptions {
   observations?: Observation[];
   gaps?: Gap[];
   limits?: { maxDepth: number; maxNodes: number; maxIterations: number };
+  /** rendered ontology/expected-schema.md, or undefined when the user gave none */
+  expectedSchema?: string;
 }
 
 const TIER_LADDER = [0, 1, 2, 3, 4, 5, 6, 7]
@@ -49,6 +51,7 @@ export function buildContext(
     NODE_DEPTHS: formatDepths(state.depth),
     DEPTH_LADDER: TIER_LADDER,
 
+    EXPECTED_SCHEMA: options.expectedSchema ?? '(none provided)',
     OBSERVATIONS: formatObservations(observations),
     EVIDENCE: formatEvidence(state),
     GAPS: formatGaps(gaps),

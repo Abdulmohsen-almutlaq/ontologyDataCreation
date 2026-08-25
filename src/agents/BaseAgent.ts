@@ -9,6 +9,8 @@ export interface AgentDeps {
   prompts: PromptLoader;
   trace: Trace;
   onMissingVariables?: (prompt: string, missing: string[]) => void;
+  /** per-call-site temperature override; return undefined to use the global default */
+  temperatureFor?: (label: string) => number | undefined;
 }
 
 export interface ReasonArgs<T> {
@@ -54,6 +56,7 @@ export abstract class BaseAgent {
         schema: args.schema,
         schemaName: args.schemaName,
         jsonSchema: args.jsonSchema,
+        temperature: this.deps.temperatureFor?.(args.label),
       });
 
       this.deps.trace.record({

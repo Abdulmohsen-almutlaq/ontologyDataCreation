@@ -3,6 +3,8 @@
 You are seeing a data source for the first time. Identify the **real-world
 things** this data is about.
 
+{{EXPECTED_SCHEMA}}
+
 # Observations
 
 {{OBSERVATIONS}}

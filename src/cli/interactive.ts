@@ -1,11 +1,15 @@
 import chalk from 'chalk';
 import * as fs from 'node:fs/promises';
+import * as os from 'node:os';
+import * as path from 'node:path';
 import * as readline from 'node:readline/promises';
 import { loadConfig, type Config } from '../config/Config';
 import { createLogger } from '../config/logger';
 import { tierName } from '../core/tiers';
 import { FileOntologyStore } from '../ontology/OntologyStore';
-import { OntologyHarness, type OntologyResult } from '../OntologyHarness';
+import { OntologyHarness, type OntologyResult, type ProgressEvent } from '../OntologyHarness';
+import { redactUrl } from '../observation/connection';
+import { defaultSourceRegistry, type SourceSupport } from '../observation/SourceRegistry';
 import {
   renderDecisions,
   renderDepths,
@@ -29,12 +33,17 @@ const SETTABLE = [
   'DATABASE_URL',
   'SOURCE_SCHEMA',
   'OBSERVATION_FIXTURE_DIR',
+  'EXPECTED_SCHEMA',
   'LLM_PROVIDER',
   'LLM_MODEL',
   'LLM_BASE_URL',
   'LLM_API_KEY',
   'LLM_MOCK_SCRIPT',
   'LLM_TEMPERATURE',
+  'LLM_COMPLETION_TEMPERATURE',
+  'DEEPSEEK_BASE_URL',
+  'DEEPSEEK_VISION_MODELS',
+  'DEEPSEEK_MAX_CONTEXT_TOKENS',
   'PROMPT_VERSION',
   'PROMPTS_DIR',
   'ONTOLOGY_MAX_DEPTH',
@@ -50,6 +59,43 @@ interface Session {
   file?: string;
 }
 
+/** Canonical command words - kept in sync with renderHelp() below; aliases
+ *  ('depths', 'quit') are left out so Tab always lands on one spelling. */
+const COMMANDS = [
+  'run', 'config', 'connect', 'sources', 'set', 'unset', 'keys', 'report',
+  'summary', 'depth', 'decisions', 'gaps', 'risks', 'node', 'runs', 'load',
+  'clear', 'help', 'exit',
+] as const;
+
+const HISTORY_FILE = path.join(os.homedir(), '.ontology-harness_history');
+const HISTORY_SIZE = 200;
+
+/** Tab-completes the command word, then `set`/`unset`'s key argument. */
+export function completer(line: string): [string[], string] {
+  const parts = line.split(' ');
+  if (parts.length === 1) {
+    const word = parts[0]!;
+    const hits = COMMANDS.filter((c) => c.startsWith(word));
+    return [hits.length ? [...hits] : [...COMMANDS], word];
+  }
+  if (parts.length === 2 && (parts[0] === 'set' || parts[0] === 'unset')) {
+    const word = parts[1]!.toUpperCase();
+    const hits = SETTABLE.filter((k) => k.startsWith(word));
+    return [[...hits], parts[1]!];
+  }
+  return [[], line];
+}
+
+/** Best-effort: a shell with no history is a worse shell, not a broken one. */
+async function loadHistory(): Promise<string[]> {
+  try {
+    const raw = await fs.readFile(HISTORY_FILE, 'utf-8');
+    return raw.split('\n').filter(Boolean).slice(0, HISTORY_SIZE);
+  } catch {
+    return [];
+  }
+}
+
 const dim = (s: string) => chalk.dim(s);
 const head = (s: string) => `\n${chalk.bold.underline(s)}\n`;
 
@@ -57,9 +103,12 @@ function out(text: string): void {
   process.stdout.write(text.endsWith('\n') ? text : text + '\n');
 }
 
+/** A connection string carries a password, so it is a secret like any key. */
+const SECRET = /KEY|DATABASE_URL/;
+
 /** Secrets are shown as a presence flag: a shared terminal is not a vault. */
 function displayValue(key: string, value: string): string {
-  return key.includes('KEY') ? chalk.dim('(set)') : value;
+  return SECRET.test(key) ? chalk.dim('(set)') : value;
 }
 
 function resolveConfig(session: Session): Config {
@@ -70,6 +119,8 @@ function renderHelp(): string {
   const rows: Array<[string, string]> = [
     ['run', 'execute one exploration with the current settings'],
     ['config', 'show the settings this session will run with'],
+    ['connect <url>', 'point at any database or warehouse by connection URL'],
+    ['sources', 'list connectable schemes and how well each is verified'],
     ['set <KEY> <VALUE>', 'change a setting for the next run'],
     ['unset <KEY>', 'drop an override, falling back to .env'],
     ['keys', 'list the settings that can be changed here'],
@@ -93,6 +144,31 @@ function renderHelp(): string {
   );
 }
 
+const SUPPORT_LABEL: Record<SourceSupport, string> = {
+  verified: chalk.green('verified'),
+  'wire-compatible': chalk.yellow('wire-compatible'),
+  unimplemented: chalk.red('not implemented'),
+};
+
+function renderSources(): string {
+  // Unimplemented drivers are listed deliberately, not filtered out: seeing
+  // "snowflake -> not implemented" is what tells someone their warehouse is
+  // recognised but not yet built, instead of leaving them to guess why
+  // `connect` rejected the scheme.
+  const rows = defaultSourceRegistry().list();
+  const width = Math.max(...rows.map((r) => r.scheme.length));
+  return (
+    head('Connectable schemes') +
+    rows
+      .map(
+        ({ scheme, driver }) =>
+          `  ${chalk.bold(scheme.padEnd(width))}  ${SUPPORT_LABEL[driver.support].padEnd(20)} ${dim(driver.name)}`
+      )
+      .join('\n') +
+    `\n\n  ${dim('connect <url> resolves the driver from the scheme, e.g.')} ${chalk.cyan('postgresql://user:pass@host:5432/db')}`
+  );
+}
+
 function renderConfig(config: Config, overrides: Record<string, string>): string {
   const rows: Array<[string, string]> = [
     ['source', config.source.kind],
@@ -100,8 +176,8 @@ function renderConfig(config: Config, overrides: Record<string, string>): string
       config.source.kind === 'postgres' ? 'database' : 'fixtures',
       config.source.kind === 'postgres'
         ? config.source.databaseUrl
-          ? dim('(set)')
-          : chalk.red('(missing)')
+          ? dim('(set) - see connect / node for the resolved driver')
+          : chalk.red('(missing) - try connect <url>')
         : config.source.fixtureDir,
     ],
     ['provider', config.llm.provider],
@@ -208,10 +284,51 @@ async function loadRun(dir: string, runId: string): Promise<OntologyResult> {
   return JSON.parse(raw) as OntologyResult;
 }
 
+/** One line per checkpoint, printed as the run happens - not just at the end. */
+function renderProgress(event: ProgressEvent, startedAt: number): string {
+  const elapsed = dim(`[${((Date.now() - startedAt) / 1000).toFixed(1)}s]`);
+  switch (event.type) {
+    case 'observing':
+      return `  ${elapsed} ${dim('connecting and reading the schema ...')}`;
+    case 'discovery':
+      return `  ${elapsed} ${chalk.bold('discovery')} ${event.entities} entities, depth ${event.depth}`;
+    case 'decision': {
+      const colour =
+        event.decision === 'STOP'
+          ? chalk.green
+          : event.decision === 'GO_DEEPER'
+            ? chalk.blue
+            : chalk.cyan;
+      const targets = event.targetNodes?.length
+        ? dim(` -> ${event.targetNodes.join(', ')}`)
+        : '';
+      const reason =
+        event.reason.length > 90 ? event.reason.slice(0, 87) + '...' : event.reason;
+      return (
+        `  ${elapsed} ${dim(`iteration ${event.iteration}`)} ${colour.bold(event.decision)}${targets}\n` +
+        `        ${dim(reason)}`
+      );
+    }
+    case 'stalled':
+      return `  ${elapsed} ${chalk.yellow('stalled')} ${dim('- no progress since the last decision')}`;
+    case 'limit':
+      return `  ${elapsed} ${chalk.yellow('hard limit')} ${dim(event.reason)}`;
+    case 'assessing':
+      return `  ${elapsed} ${dim('writing the completion summary ...')}`;
+    case 'error':
+      return `  ${elapsed} ${chalk.red('error')} ${event.message}`;
+  }
+}
+
 async function doRun(session: Session): Promise<string> {
   const config = resolveConfig(session);
   const logger = createLogger(config.logLevel);
-  const harness = new OntologyHarness({ config, logger });
+  const startedAt = Date.now();
+  const harness = new OntologyHarness({
+    config,
+    logger,
+    onProgress: (event) => out(renderProgress(event, startedAt)),
+  });
 
   out(
     `\n  ${dim('running')} ${chalk.bold(config.llm.provider)}/${chalk.bold(
@@ -261,6 +378,50 @@ async function dispatch(session: Session, line: string): Promise<boolean> {
     case 'config':
       out(renderConfig(resolveConfig(session), session.overrides));
       return true;
+
+    case 'sources':
+      out(renderSources());
+      return true;
+
+    case 'connect': {
+      const url = rest.join(' ');
+      if (!url) {
+        out(`  ${dim('usage:')} connect <url>`);
+        out(`  ${dim('see')} ${chalk.bold('sources')} ${dim('for connectable schemes')}`);
+        return true;
+      }
+      // Resolved before it touches config: a bad scheme, or a recognised but
+      // unimplemented one, is rejected at the point it was typed - the same
+      // reasoning `set` already applies to a bad configuration combination.
+      let redacted: string;
+      try {
+        const { driver, connection } = defaultSourceRegistry().createObserver(url, 'public');
+        redacted = connection.redacted;
+        out(`  ${chalk.cyan(driver.name)} ${dim('<-')} ${redacted}`);
+        if (driver.support === 'wire-compatible') {
+          out(`  ${chalk.yellow('!')} ${driver.note}`);
+        }
+      } catch (err) {
+        out(renderFatal((err as Error).message));
+        return true;
+      }
+
+      // The URL itself carries the password (SECRET already masks
+      // DATABASE_URL in every echo), and the driver check above did not touch
+      // session state, so nothing here needs reverting on the next check.
+      const previous = { ...session.overrides };
+      session.overrides.SOURCE_KIND = 'postgres';
+      session.overrides.DATABASE_URL = url;
+      try {
+        resolveConfig(session);
+        out(`  ${dim('connected. try')} ${chalk.bold('run')}`);
+      } catch (err) {
+        session.overrides = previous;
+        out(renderFatal((err as Error).message));
+        out(`  ${dim('reverted; the connection is unchanged')}`);
+      }
+      return true;
+    }
 
     case 'set': {
       const [key, ...value] = rest;
@@ -390,7 +551,7 @@ export async function startInteractive(): Promise<void> {
   out(
     `${dim('type')} ${chalk.bold('help')} ${dim('for commands,')} ${chalk.bold(
       'exit'
-    )} ${dim('to leave')}`
+    )} ${dim('to leave -')} ${dim('Tab completes, ↑/↓ recall history across sessions')}`
   );
 
   try {
@@ -408,8 +569,17 @@ export async function startInteractive(): Promise<void> {
   const rl = readline.createInterface({
     input: process.stdin,
     output: process.stdout,
+    completer,
+    history: await loadHistory(),
+    historySize: HISTORY_SIZE,
+    removeHistoryDuplicates: true,
   });
   rl.on('SIGINT', () => rl.close());
+  // Fire-and-forget: persisting one command line must never block or crash
+  // the shell over it, so a write failure is silently dropped.
+  rl.on('history', (history) => {
+    fs.writeFile(HISTORY_FILE, history.join('\n'), 'utf-8').catch(() => undefined);
+  });
 
   try {
     for (;;) {

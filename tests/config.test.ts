@@ -57,4 +57,22 @@ describe('configuration', () => {
       'unset overrides must not shadow the provider default'
     );
   });
+
+  test('completion temperature is unset by default, unlike LLM_TEMPERATURE', () => {
+    const config = loadConfig(testEnv('stop-early'));
+    assert.equal(config.llm.temperature, 0, 'LLM_TEMPERATURE always has a fallback');
+    assert.equal(
+      config.llm.completionTemperature,
+      undefined,
+      'no fallback - "unset" must stay distinguishable from "set to 0"'
+    );
+  });
+
+  test('LLM_COMPLETION_TEMPERATURE overrides only the completion call site', () => {
+    const config = loadConfig(
+      testEnv('stop-early', { LLM_COMPLETION_TEMPERATURE: '0.5' })
+    );
+    assert.equal(config.llm.completionTemperature, 0.5);
+    assert.equal(config.llm.temperature, 0, 'the global default is untouched');
+  });
 });

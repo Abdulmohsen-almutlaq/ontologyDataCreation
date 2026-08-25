@@ -1,3 +1,47 @@
+# The harness runs one exploration and exits; `cli` is the same image held open
+# as an interactive shell. Both share one environment block so a setting can
+# never drift between the batch run and the shell that is meant to reproduce it.
+x-harness-env: &harness-env
+  NODE_ENV: ${NODE_ENV:-production}
+  PORT: ${PORT:-3000}
+  LOG_LEVEL: ${LOG_LEVEL:-info}
+  SOURCE_KIND: ${SOURCE_KIND:-postgres}
+  DATABASE_URL: ${DATABASE_URL:-postgresql://postgres:postgres@postgres:5432/ontology}
+  SOURCE_SCHEMA: ${SOURCE_SCHEMA:-public}
+  # Paths inside the image, not the host: the prod stage copies fixtures to /app.
+  OBSERVATION_FIXTURE_DIR: ${OBSERVATION_FIXTURE_DIR:-/app/tests/fixtures/observation}
+  EXPECTED_SCHEMA: ${EXPECTED_SCHEMA:-}
+  # The LLM is NOT containerised here: point at a host or cloud endpoint.
+  LLM_PROVIDER: ${LLM_PROVIDER:-ollama}
+  LLM_MODEL: ${LLM_MODEL:-qwen3:8b}
+  LLM_BASE_URL: ${LLM_BASE_URL:-http://host.docker.internal:11434}
+  LLM_API_KEY: ${LLM_API_KEY:-}
+  LLM_TEMPERATURE: ${LLM_TEMPERATURE:-0}
+  LLM_MAX_TOKENS: ${LLM_MAX_TOKENS:-8192}
+  # Only read when LLM_PROVIDER=mock; carried so `set LLM_PROVIDER mock` in the
+  # shell is a one-word change rather than a restart with new environment.
+  LLM_MOCK_SCRIPT: ${LLM_MOCK_SCRIPT:-/app/tests/fixtures/llm/asymmetric-depth.json}
+  # DeepSeek vendor facts. Note that LLM_BASE_URL above always carries the
+  # Ollama default, so LLM_PROVIDER=deepseek needs LLM_BASE_URL set explicitly
+  # here or the call goes to the wrong host.
+  DEEPSEEK_BASE_URL: ${DEEPSEEK_BASE_URL:-https://api.deepseek.com}
+  DEEPSEEK_VISION_MODELS: ${DEEPSEEK_VISION_MODELS:-deepseek-v4-flash-vision-exp}
+  DEEPSEEK_MAX_CONTEXT_TOKENS: ${DEEPSEEK_MAX_CONTEXT_TOKENS:-1000000}
+  PROMPTS_DIR: /app/prompts
+  PROMPT_VERSION: ${PROMPT_VERSION:-v1}
+  ONTOLOGY_MAX_DEPTH: ${ONTOLOGY_MAX_DEPTH:-10}
+  ONTOLOGY_MAX_ITERATIONS: ${ONTOLOGY_MAX_ITERATIONS:-25}
+  ONTOLOGY_MAX_LLM_CALLS: ${ONTOLOGY_MAX_LLM_CALLS:-100}
+  ONTOLOGY_MAX_NODES: ${ONTOLOGY_MAX_NODES:-1000}
+  ONTOLOGY_MAX_OBSERVATION_REQUESTS: ${ONTOLOGY_MAX_OBSERVATION_REQUESTS:-200}
+  ONTOLOGY_MAX_RUNTIME_MS: ${ONTOLOGY_MAX_RUNTIME_MS:-900000}
+  OUTPUT_DIR: /app/out
+
+x-harness-volumes: &harness-volumes
+  - ./out:/app/out
+  # Edit prompts without rebuilding the image.
+  - ./prompts:/app/prompts:ro
+
 services:
   postgres:
     image: postgres:16-alpine
@@ -23,37 +67,38 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    environment:
-      NODE_ENV: ${NODE_ENV:-production}
-      PORT: ${PORT:-3000}
-      LOG_LEVEL: ${LOG_LEVEL:-info}
-      SOURCE_KIND: ${SOURCE_KIND:-postgres}
-      DATABASE_URL: ${DATABASE_URL:-postgresql://postgres:postgres@postgres:5432/ontology}
-      SOURCE_SCHEMA: ${SOURCE_SCHEMA:-public}
-      # The LLM is NOT containerised here: point at a host or cloud endpoint.
-      LLM_PROVIDER: ${LLM_PROVIDER:-ollama}
-      LLM_MODEL: ${LLM_MODEL:-qwen3:8b}
-      LLM_BASE_URL: ${LLM_BASE_URL:-http://host.docker.internal:11434}
-      LLM_API_KEY: ${LLM_API_KEY:-}
-      LLM_TEMPERATURE: ${LLM_TEMPERATURE:-0}
-      LLM_MAX_TOKENS: ${LLM_MAX_TOKENS:-8192}
-      PROMPTS_DIR: /app/prompts
-      PROMPT_VERSION: ${PROMPT_VERSION:-v1}
-      ONTOLOGY_MAX_DEPTH: ${ONTOLOGY_MAX_DEPTH:-10}
-      ONTOLOGY_MAX_ITERATIONS: ${ONTOLOGY_MAX_ITERATIONS:-25}
-      ONTOLOGY_MAX_LLM_CALLS: ${ONTOLOGY_MAX_LLM_CALLS:-100}
-      ONTOLOGY_MAX_NODES: ${ONTOLOGY_MAX_NODES:-1000}
-      ONTOLOGY_MAX_OBSERVATION_REQUESTS: ${ONTOLOGY_MAX_OBSERVATION_REQUESTS:-200}
-      ONTOLOGY_MAX_RUNTIME_MS: ${ONTOLOGY_MAX_RUNTIME_MS:-900000}
-      OUTPUT_DIR: /app/out
-    volumes:
-      - ./out:/app/out
-      # Edit prompts without rebuilding the image.
-      - ./prompts:/app/prompts:ro
+    environment: *harness-env
+    volumes: *harness-volumes
     extra_hosts:
       - "host.docker.internal:host-gateway"
     ports:
       - "${PORT:-3000}:3000"
+
+  # docker compose run --rm cli
+  #
+  # Behind a profile so `docker compose up` never starts it: a shell with no
+  # attached terminal would sit on a prompt nobody can answer. Pinned to the
+  # prod stage because the command runs dist/, which the dev stage has not built.
+  # No `ports` — publishing 3000 twice is a hard error if both services run.
+  # No `depends_on` — a fixture-mode session should not have to wait on
+  # PostgreSQL. Add --no-deps is unnecessary; start postgres yourself when the
+  # session needs it.
+  cli:
+    profiles: ["cli"]
+    build:
+      context: .
+      target: prod
+    command: ["node", "dist/index.js", "--interactive"]
+    environment:
+      <<: *harness-env
+      # Structured logs and the prompt share stderr; the shell overrides this
+      # itself, and the default here keeps a piped session readable too.
+      LOG_LEVEL: ${LOG_LEVEL:-warn}
+    volumes: *harness-volumes
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    stdin_open: true
+    tty: true
 
 volumes:
   pgdata:

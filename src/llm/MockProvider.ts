@@ -41,7 +41,7 @@ export class MockClient implements LLMClient {
   readonly capabilities: LLMCapabilities;
   private readonly queues = new Map<string, ScriptEntry[]>();
   private readonly fallbacks = new Map<string, ScriptEntry>();
-  readonly calls: Array<{ label: string; prompt: string }> = [];
+  readonly calls: Array<{ label: string; prompt: string; temperature?: number }> = [];
 
   constructor(script: Script, model: string, capabilities: LLMCapabilities) {
     this.model = model;
@@ -72,7 +72,7 @@ export class MockClient implements LLMClient {
 
   async complete(request: LLMRequest): Promise<LLMCompletion> {
     const label = request.label ?? 'default';
-    this.calls.push({ label, prompt: request.prompt });
+    this.calls.push({ label, prompt: request.prompt, temperature: request.temperature });
 
     const queue = this.queues.get(label);
     const entry = (queue && queue.shift()) ?? this.fallbacks.get(label);
