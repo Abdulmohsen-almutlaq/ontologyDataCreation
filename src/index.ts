@@ -1,3 +1,4 @@
+import { startInteractive } from './cli/interactive';
 import { renderFatal, renderReport } from './cli/report';
 import { loadConfig } from './config/Config';
 import { createLogger } from './config/logger';
@@ -10,8 +11,19 @@ import { OntologyHarness } from './OntologyHarness';
  * Per the MVP scope, the deliverable is the exploration loop over PostgreSQL
  * with a local model; the HTTP layer is deliberately not built yet. PORT is
  * carried in configuration so that adding one later needs no config change.
+ *
+ * One run and exit stays the default because that is what the container's CMD
+ * invokes; a shell has to be asked for, and is refused without a terminal
+ * rather than left waiting on input that will never arrive.
  */
-async function main(): Promise<void> {
+async function main(argv: string[] = process.argv.slice(2)): Promise<void> {
+  if (argv.includes('--interactive') || argv.includes('-i')) {
+    if (!process.stdin.isTTY) {
+      throw new Error('--interactive needs a terminal; run without it for one batch run');
+    }
+    return startInteractive();
+  }
+
   const config = loadConfig();
   const logger = createLogger(config.logLevel);
 

@@ -13,7 +13,8 @@
     "start": "node dist/index.js",
     "dev": "tsc -p tsconfig.json --watch",
     "test": "npm run build:tests && node --test dist-tests/tests/*.test.js",
-    "build:tests": "tsc -p tsconfig.tests.json"
+    "build:tests": "tsc -p tsconfig.tests.json",
+    "cli": "node dist/index.js --interactive"
   },
   "dependencies": {
     "chalk": "^4.1.2",
