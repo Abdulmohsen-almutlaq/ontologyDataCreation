@@ -1,0 +1,52 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ObservationPlan",
+  "type": "object",
+  "required": [
+    "requests"
+  ],
+  "properties": {
+    "reasoning": {
+      "type": "string"
+    },
+    "requests": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "target",
+          "observationType",
+          "reason"
+        ],
+        "properties": {
+          "target": {
+            "type": "string"
+          },
+          "observationType": {
+            "type": "string",
+            "enum": [
+              "schema_overview",
+              "table_metadata",
+              "column_statistics",
+              "distinct_values",
+              "value_distribution",
+              "sample_rows",
+              "distinct_overlap",
+              "relationship_evidence",
+              "temporal_distribution"
+            ]
+          },
+          "reason": {
+            "type": "string"
+          },
+          "compareTo": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "integer"
+          }
+        }
+      }
+    }
+  }
+}

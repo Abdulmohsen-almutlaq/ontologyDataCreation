@@ -1,0 +1,59 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-ontology}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./sql:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-ontology}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  ontology-harness:
+    build:
+      context: .
+      target: ${BUILD_TARGET:-prod}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV: ${NODE_ENV:-production}
+      PORT: ${PORT:-3000}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      SOURCE_KIND: ${SOURCE_KIND:-postgres}
+      DATABASE_URL: ${DATABASE_URL:-postgresql://postgres:postgres@postgres:5432/ontology}
+      SOURCE_SCHEMA: ${SOURCE_SCHEMA:-public}
+      # The LLM is NOT containerised here: point at a host or cloud endpoint.
+      LLM_PROVIDER: ${LLM_PROVIDER:-ollama}
+      LLM_MODEL: ${LLM_MODEL:-qwen3:8b}
+      LLM_BASE_URL: ${LLM_BASE_URL:-http://host.docker.internal:11434}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_TEMPERATURE: ${LLM_TEMPERATURE:-0}
+      LLM_MAX_TOKENS: ${LLM_MAX_TOKENS:-8192}
+      PROMPTS_DIR: /app/prompts
+      PROMPT_VERSION: ${PROMPT_VERSION:-v1}
+      ONTOLOGY_MAX_DEPTH: ${ONTOLOGY_MAX_DEPTH:-10}
+      ONTOLOGY_MAX_ITERATIONS: ${ONTOLOGY_MAX_ITERATIONS:-25}
+      ONTOLOGY_MAX_LLM_CALLS: ${ONTOLOGY_MAX_LLM_CALLS:-100}
+      ONTOLOGY_MAX_NODES: ${ONTOLOGY_MAX_NODES:-1000}
+      ONTOLOGY_MAX_OBSERVATION_REQUESTS: ${ONTOLOGY_MAX_OBSERVATION_REQUESTS:-200}
+      ONTOLOGY_MAX_RUNTIME_MS: ${ONTOLOGY_MAX_RUNTIME_MS:-900000}
+      OUTPUT_DIR: /app/out
+    volumes:
+      - ./out:/app/out
+      # Edit prompts without rebuilding the image.
+      - ./prompts:/app/prompts:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "${PORT:-3000}:3000"
+
+volumes:
+  pgdata:

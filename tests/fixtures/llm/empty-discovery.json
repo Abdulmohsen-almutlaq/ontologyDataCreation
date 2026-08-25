@@ -1,0 +1,34 @@
+{
+  "name": "empty-discovery",
+  "description": "Discovery emits only operations the engine must refuse.",
+  "entries": [
+    {
+      "label": "discovery",
+      "response": {
+        "reasoning": "Everything is observed.",
+        "confidence": 0.99,
+        "operations": [
+          {
+            "type": "ADD_ENTITY",
+            "name": "Customer",
+            "description": "x",
+            "attributes": [],
+            "status": "OBSERVED",
+            "confidence": 0.99,
+            "evidence": [],
+            "source": []
+          }
+        ]
+      }
+    },
+    {
+      "label": "discovery",
+      "fallback": true,
+      "response": {
+        "reasoning": "Same again.",
+        "confidence": 0.99,
+        "operations": []
+      }
+    }
+  ]
+}

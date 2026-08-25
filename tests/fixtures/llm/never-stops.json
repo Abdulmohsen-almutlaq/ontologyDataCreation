@@ -1,0 +1,257 @@
+{
+  "name": "never-stops",
+  "description": "A model that answers GO_DEEPER forever; the harness must stop it.",
+  "entries": [
+    {
+      "label": "discovery",
+      "response": {
+        "reasoning": "Six physical tables describe three real-world things plus two financial events.",
+        "confidence": 0.85,
+        "operations": [
+          {
+            "type": "ADD_ENTITY",
+            "name": "Customer",
+            "description": "A person who buys from the store.",
+            "attributes": [
+              {
+                "name": "id",
+                "type": "integer",
+                "semanticRole": "identifier",
+                "status": "OBSERVED",
+                "confidence": 0.9,
+                "evidence": [
+                  {
+                    "locator": "customers.id",
+                    "summary": "column present in schema_overview",
+                    "status": "OBSERVED"
+                  }
+                ]
+              },
+              {
+                "name": "email",
+                "type": "text",
+                "semanticRole": "natural_key",
+                "status": "OBSERVED",
+                "confidence": 0.9,
+                "evidence": [
+                  {
+                    "locator": "customers.email",
+                    "summary": "column present in schema_overview",
+                    "status": "OBSERVED"
+                  }
+                ]
+              }
+            ],
+            "status": "OBSERVED",
+            "confidence": 0.92,
+            "evidence": [
+              {
+                "locator": "customers",
+                "summary": "present in schema_overview",
+                "status": "OBSERVED"
+              }
+            ],
+            "source": [
+              {
+                "locator": "postgres:public.customers",
+                "kind": "table"
+              }
+            ]
+          },
+          {
+            "type": "ADD_ENTITY",
+            "name": "Order",
+            "description": "A purchase committed by a customer.",
+            "attributes": [
+              {
+                "name": "id",
+                "type": "integer",
+                "semanticRole": "identifier",
+                "status": "OBSERVED",
+                "confidence": 0.9,
+                "evidence": [
+                  {
+                    "locator": "orders.id",
+                    "summary": "column present in schema_overview",
+                    "status": "OBSERVED"
+                  }
+                ]
+              },
+              {
+                "name": "customer_id",
+                "type": "integer",
+                "semanticRole": "foreign_key",
+                "status": "OBSERVED",
+                "confidence": 0.9,
+                "evidence": [
+                  {
+                    "locator": "orders.customer_id",
+                    "summary": "column present in schema_overview",
+                    "status": "OBSERVED"
+                  }
+                ]
+              },
+              {
+                "name": "status",
+                "type": "text",
+                "semanticRole": "status",
+                "status": "OBSERVED",
+                "confidence": 0.9,
+                "evidence": [
+                  {
+                    "locator": "orders.status",
+                    "summary": "column present in schema_overview",
+                    "status": "OBSERVED"
+                  }
+                ]
+              },
+              {
+                "name": "total_amount",
+                "type": "numeric",
+                "semanticRole": "amount",
+                "status": "OBSERVED",
+                "confidence": 0.9,
+                "evidence": [
+                  {
+                    "locator": "orders.total_amount",
+                    "summary": "column present in schema_overview",
+                    "status": "OBSERVED"
+                  }
+                ]
+              }
+            ],
+            "status": "OBSERVED",
+            "confidence": 0.92,
+            "evidence": [
+              {
+                "locator": "orders",
+                "summary": "present in schema_overview",
+                "status": "OBSERVED"
+              }
+            ],
+            "source": [
+              {
+                "locator": "postgres:public.orders",
+                "kind": "table"
+              }
+            ]
+          },
+          {
+            "type": "ADD_ENTITY",
+            "name": "Product",
+            "description": "An item offered for sale.",
+            "attributes": [
+              {
+                "name": "id",
+                "type": "integer",
+                "semanticRole": "identifier",
+                "status": "OBSERVED",
+                "confidence": 0.9,
+                "evidence": [
+                  {
+                    "locator": "products.id",
+                    "summary": "column present in schema_overview",
+                    "status": "OBSERVED"
+                  }
+                ]
+              },
+              {
+                "name": "sku",
+                "type": "text",
+                "semanticRole": "natural_key",
+                "status": "OBSERVED",
+                "confidence": 0.9,
+                "evidence": [
+                  {
+                    "locator": "products.sku",
+                    "summary": "column present in schema_overview",
+                    "status": "OBSERVED"
+                  }
+                ]
+              }
+            ],
+            "status": "OBSERVED",
+            "confidence": 0.92,
+            "evidence": [
+              {
+                "locator": "products",
+                "summary": "present in schema_overview",
+                "status": "OBSERVED"
+              }
+            ],
+            "source": [
+              {
+                "locator": "postgres:public.products",
+                "kind": "table"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "label": "gap-analysis",
+      "fallback": true,
+      "response": {
+        "gaps": []
+      }
+    },
+    {
+      "label": "depth-decision",
+      "fallback": true,
+      "response": {
+        "decision": "GO_DEEPER",
+        "targetDepth": 4,
+        "targetNodes": [
+          "product"
+        ],
+        "reason": "There is always more to model.",
+        "expectedValue": 0.9,
+        "expectedInformationGain": 0.9,
+        "uncertainty": 0.9,
+        "complexityCost": 0.1,
+        "nextFocus": [
+          "everything"
+        ],
+        "requiredEvidence": []
+      }
+    },
+    {
+      "label": "concept-discovery",
+      "fallback": true,
+      "response": {
+        "reasoning": "Nothing new to add.",
+        "confidence": 0.4,
+        "operations": []
+      }
+    },
+    {
+      "label": "observation-planning",
+      "fallback": true,
+      "response": {
+        "reasoning": "Fall back to inspecting the focused table.",
+        "requests": [
+          {
+            "target": "public.orders",
+            "observationType": "table_metadata",
+            "reason": "Confirm the columns in play."
+          }
+        ]
+      }
+    },
+    {
+      "label": "completion",
+      "fallback": true,
+      "response": {
+        "sufficient": true,
+        "confidence": 0.82,
+        "summary": "A retail store: customers place orders for products, orders are paid and occasionally refunded. Revenue is modelled explicitly because the raw order total does not mean what it appears to.",
+        "remainingRisks": [
+          "Net Revenue assumes one refund row per refund event; partial refunds were never confirmed.",
+          "Amounts are per-currency and are not converted, so cross-currency totals are meaningless.",
+          "Product was left at depth 2 and carries no relationship to Order."
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,85 @@
+{
+  "name": "unsupported-claim",
+  "description": "An entity asserted as OBSERVED with no evidence at all.",
+  "entries": [
+    {
+      "label": "discovery",
+      "response": {
+        "reasoning": "Confident from the table names alone.",
+        "confidence": 0.95,
+        "operations": [
+          {
+            "type": "ADD_ENTITY",
+            "name": "Customer",
+            "description": "A buyer.",
+            "attributes": [],
+            "status": "OBSERVED",
+            "confidence": 0.99,
+            "evidence": [],
+            "source": []
+          },
+          {
+            "type": "ADD_ENTITY",
+            "name": "Product",
+            "description": "An item for sale.",
+            "attributes": [],
+            "status": "INFERRED",
+            "confidence": 0.4,
+            "evidence": [],
+            "source": []
+          }
+        ]
+      }
+    },
+    {
+      "label": "gap-analysis",
+      "fallback": true,
+      "response": {
+        "gaps": []
+      }
+    },
+    {
+      "label": "depth-decision",
+      "fallback": true,
+      "response": {
+        "decision": "STOP",
+        "targetNodes": [],
+        "reason": "Stop.",
+        "expectedValue": 0.1,
+        "expectedInformationGain": 0.1,
+        "uncertainty": 0.5,
+        "complexityCost": 0.5,
+        "nextFocus": [],
+        "requiredEvidence": []
+      }
+    },
+    {
+      "label": "observation-planning",
+      "fallback": true,
+      "response": {
+        "reasoning": "Fall back to inspecting the focused table.",
+        "requests": [
+          {
+            "target": "public.orders",
+            "observationType": "table_metadata",
+            "reason": "Confirm the columns in play."
+          }
+        ]
+      }
+    },
+    {
+      "label": "completion",
+      "fallback": true,
+      "response": {
+        "sufficient": true,
+        "confidence": 0.82,
+        "summary": "A retail store: customers place orders for products, orders are paid and occasionally refunded. Revenue is modelled explicitly because the raw order total does not mean what it appears to.",
+        "remainingRisks": [
+          "Net Revenue assumes one refund row per refund event; partial refunds were never confirmed.",
+          "Amounts are per-currency and are not converted, so cross-currency totals are meaningless.",
+          "Product was left at depth 2 and carries no relationship to Order."
+        ]
+      }
+    }
+  ]
+}

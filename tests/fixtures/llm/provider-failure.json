@@ -1,0 +1,18 @@
+{
+  "name": "provider-failure",
+  "description": "The provider fails on the first call.",
+  "entries": [
+    {
+      "label": "discovery",
+      "error": "connection refused: no model server at LLM_BASE_URL"
+    },
+    {
+      "label": "discovery",
+      "error": "connection refused: no model server at LLM_BASE_URL"
+    },
+    {
+      "label": "discovery",
+      "error": "connection refused: no model server at LLM_BASE_URL"
+    }
+  ]
+}

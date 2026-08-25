@@ -1,0 +1,9 @@
+node_modules/
+dist/
+dist-tests/
+.env
+*.log
+coverage/
+out/
+tests/.out/
+graphify-out/

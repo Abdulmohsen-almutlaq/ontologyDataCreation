@@ -1,0 +1,110 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "OntologyOperations",
+  "type": "object",
+  "required": [
+    "operations"
+  ],
+  "properties": {
+    "reasoning": {
+      "type": "string"
+    },
+    "confidence": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "operations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "type"
+        ],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "ADD_ENTITY",
+              "UPDATE_ENTITY",
+              "ADD_ATTRIBUTE",
+              "UPDATE_ATTRIBUTE",
+              "ADD_RELATIONSHIP",
+              "UPDATE_RELATIONSHIP",
+              "ADD_CONCEPT",
+              "ADD_METRIC",
+              "ADD_EVENT",
+              "ADD_RULE",
+              "MERGE_CONCEPT",
+              "MARK_UNCERTAIN",
+              "REQUEST_OBSERVATION"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "entity": {
+            "type": "string"
+          },
+          "attribute": {},
+          "target": {
+            "type": "string"
+          },
+          "relationship": {
+            "type": "string"
+          },
+          "cardinality": {
+            "type": "string"
+          },
+          "definition": {
+            "type": "string"
+          },
+          "expression": {
+            "type": "string"
+          },
+          "basedOn": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "attributes": {
+            "type": "array"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "OBSERVED",
+              "INFERRED",
+              "DERIVED",
+              "ASSUMED",
+              "UNKNOWN"
+            ]
+          },
+          "confidence": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "evidence": {
+            "type": "array"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "observationType": {
+            "type": "string"
+          },
+          "sourceRefs": {
+            "type": "array"
+          },
+          "source": {}
+        }
+      }
+    }
+  },
+  "description": "Shape hint for providers that constrain generation natively. src/schemas/llm.ts is authoritative; keys whose type differs between operations are omitted here on purpose."
+}

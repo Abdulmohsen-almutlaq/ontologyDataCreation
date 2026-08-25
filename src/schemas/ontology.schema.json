@@ -1,0 +1,45 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Ontology",
+  "description": "Shape of the finalised ontology document written to OUTPUT_DIR.",
+  "type": "object",
+  "required": [
+    "id",
+    "datasetName",
+    "entities",
+    "relationships",
+    "concepts"
+  ],
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "datasetName": {
+      "type": "string"
+    },
+    "datasetDescription": {
+      "type": "string"
+    },
+    "entities": {
+      "type": "array"
+    },
+    "relationships": {
+      "type": "array"
+    },
+    "concepts": {
+      "type": "array"
+    },
+    "metrics": {
+      "type": "array"
+    },
+    "events": {
+      "type": "array"
+    },
+    "rules": {
+      "type": "array"
+    },
+    "uncertain": {
+      "type": "array"
+    }
+  }
+}

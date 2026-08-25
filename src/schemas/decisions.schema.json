@@ -1,0 +1,88 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "DepthDecision",
+  "type": "object",
+  "required": [
+    "decision",
+    "reason"
+  ],
+  "properties": {
+    "decision": {
+      "type": "string",
+      "enum": [
+        "STOP",
+        "GO_DEEPER",
+        "REFINE_CURRENT",
+        "REQUEST_EVIDENCE"
+      ]
+    },
+    "targetDepth": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 32
+    },
+    "targetNodes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "reason": {
+      "type": "string"
+    },
+    "expectedValue": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "expectedInformationGain": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "uncertainty": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "complexityCost": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "nextFocus": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "requiredEvidence": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "target",
+          "observationType",
+          "reason"
+        ],
+        "properties": {
+          "target": {
+            "type": "string"
+          },
+          "observationType": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "compareTo": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "integer"
+          }
+        }
+      }
+    }
+  }
+}

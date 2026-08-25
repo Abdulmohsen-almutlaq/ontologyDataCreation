@@ -1,0 +1,344 @@
+{
+  "schemaOverview": {
+    "schema": "public",
+    "tables": [
+      {
+        "table": "customers",
+        "comment": null,
+        "estimated_rows": 1200
+      },
+      {
+        "table": "orders",
+        "comment": null,
+        "estimated_rows": 8400
+      },
+      {
+        "table": "order_items",
+        "comment": null,
+        "estimated_rows": 21000
+      },
+      {
+        "table": "products",
+        "comment": null,
+        "estimated_rows": 340
+      },
+      {
+        "table": "payments",
+        "comment": null,
+        "estimated_rows": 8100
+      },
+      {
+        "table": "refunds",
+        "comment": null,
+        "estimated_rows": 260
+      }
+    ],
+    "columns": [
+      {
+        "table": "customers",
+        "column": "id",
+        "type": "integer",
+        "nullable": false
+      },
+      {
+        "table": "customers",
+        "column": "email",
+        "type": "text",
+        "nullable": false
+      },
+      {
+        "table": "customers",
+        "column": "created_at",
+        "type": "timestamptz",
+        "nullable": false
+      },
+      {
+        "table": "orders",
+        "column": "id",
+        "type": "integer",
+        "nullable": false
+      },
+      {
+        "table": "orders",
+        "column": "customer_id",
+        "type": "integer",
+        "nullable": false
+      },
+      {
+        "table": "orders",
+        "column": "status",
+        "type": "text",
+        "nullable": false
+      },
+      {
+        "table": "orders",
+        "column": "total_amount",
+        "type": "numeric",
+        "nullable": false
+      },
+      {
+        "table": "orders",
+        "column": "currency",
+        "type": "text",
+        "nullable": false
+      },
+      {
+        "table": "orders",
+        "column": "placed_at",
+        "type": "timestamptz",
+        "nullable": false
+      },
+      {
+        "table": "products",
+        "column": "id",
+        "type": "integer",
+        "nullable": false
+      },
+      {
+        "table": "products",
+        "column": "sku",
+        "type": "text",
+        "nullable": false
+      },
+      {
+        "table": "products",
+        "column": "name",
+        "type": "text",
+        "nullable": false
+      },
+      {
+        "table": "refunds",
+        "column": "id",
+        "type": "integer",
+        "nullable": false
+      },
+      {
+        "table": "refunds",
+        "column": "order_id",
+        "type": "integer",
+        "nullable": false
+      },
+      {
+        "table": "refunds",
+        "column": "amount",
+        "type": "numeric",
+        "nullable": false
+      }
+    ],
+    "primaryKeys": [
+      {
+        "table": "customers",
+        "column": "id"
+      },
+      {
+        "table": "orders",
+        "column": "id"
+      },
+      {
+        "table": "products",
+        "column": "id"
+      },
+      {
+        "table": "refunds",
+        "column": "id"
+      }
+    ],
+    "foreignKeys": [
+      {
+        "constraint_name": "orders_customer_id_fkey",
+        "from_table": "orders",
+        "from_column": "customer_id",
+        "to_table": "customers",
+        "to_column": "id"
+      },
+      {
+        "constraint_name": "refunds_order_id_fkey",
+        "from_table": "refunds",
+        "from_column": "order_id",
+        "to_table": "orders",
+        "to_column": "id"
+      }
+    ]
+  },
+  "tableMetadata": {
+    "public.orders": {
+      "table": "public.orders",
+      "rowCount": 8400,
+      "columns": [
+        {
+          "column": "id",
+          "type": "integer",
+          "nullable": false
+        },
+        {
+          "column": "customer_id",
+          "type": "integer",
+          "nullable": false
+        },
+        {
+          "column": "status",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "column": "total_amount",
+          "type": "numeric",
+          "nullable": false
+        },
+        {
+          "column": "currency",
+          "type": "text",
+          "nullable": false
+        }
+      ],
+      "indexes": [],
+      "constraints": []
+    }
+  },
+  "columnStatistics": {
+    "orders.total_amount": {
+      "column": "orders.total_amount",
+      "totalRows": 8400,
+      "nonNullRows": 8400,
+      "nullRate": 0.0,
+      "distinctValues": 6120,
+      "distinctRatio": 0.7286,
+      "min": "0.00",
+      "max": "4210.55"
+    },
+    "customers.id": {
+      "column": "customers.id",
+      "totalRows": 1200,
+      "nonNullRows": 1200,
+      "nullRate": 0.0,
+      "distinctValues": 1200,
+      "distinctRatio": 1.0,
+      "min": "1",
+      "max": "1200"
+    }
+  },
+  "valueDistribution": {
+    "orders.status": {
+      "column": "orders.status",
+      "distribution": [
+        {
+          "value": "delivered",
+          "frequency": 5900,
+          "share": 0.7024
+        },
+        {
+          "value": "shipped",
+          "frequency": 1400,
+          "share": 0.1667
+        },
+        {
+          "value": "pending",
+          "frequency": 700,
+          "share": 0.0833
+        },
+        {
+          "value": "cancelled",
+          "frequency": 400,
+          "share": 0.0476
+        }
+      ]
+    },
+    "orders.currency": {
+      "column": "orders.currency",
+      "distribution": [
+        {
+          "value": "USD",
+          "frequency": 6300,
+          "share": 0.75
+        },
+        {
+          "value": "EUR",
+          "frequency": 1680,
+          "share": 0.2
+        },
+        {
+          "value": "GBP",
+          "frequency": 420,
+          "share": 0.05
+        }
+      ]
+    }
+  },
+  "distinctValues": {
+    "orders.status": {
+      "column": "orders.status",
+      "values": [
+        "cancelled",
+        "delivered",
+        "pending",
+        "shipped"
+      ]
+    }
+  },
+  "sampleRows": {
+    "public.refunds": {
+      "table": "public.refunds",
+      "rows": [
+        {
+          "id": 1,
+          "order_id": 42,
+          "amount": "19.99"
+        },
+        {
+          "id": 2,
+          "order_id": 77,
+          "amount": "120.00"
+        }
+      ]
+    }
+  },
+  "columnOverlap": {
+    "orders.customer_id|customers.id": {
+      "left": "orders.customer_id",
+      "right": "customers.id",
+      "leftDistinct": 1180,
+      "rightDistinct": 1200,
+      "shared": 1180,
+      "leftCoveredByRight": 1.0,
+      "rightCoveredByLeft": 0.9833
+    },
+    "refunds.order_id|orders.id": {
+      "left": "refunds.order_id",
+      "right": "orders.id",
+      "leftDistinct": 255,
+      "rightDistinct": 8400,
+      "shared": 255,
+      "leftCoveredByRight": 1.0,
+      "rightCoveredByLeft": 0.0304
+    }
+  },
+  "relationshipEvidence": {
+    "public.orders": {
+      "table": "public.orders",
+      "declaredForeignKeys": [
+        {
+          "constraint_name": "orders_customer_id_fkey",
+          "from_column": "customer_id",
+          "to_table": "customers",
+          "to_column": "id"
+        }
+      ],
+      "undeclaredCandidates": []
+    }
+  },
+  "temporalDistribution": {
+    "orders.placed_at": {
+      "column": "orders.placed_at",
+      "buckets": [
+        {
+          "bucket": "2025-01-01T00:00:00Z",
+          "frequency": 700
+        },
+        {
+          "bucket": "2025-02-01T00:00:00Z",
+          "frequency": 820
+        }
+      ]
+    }
+  }
+}

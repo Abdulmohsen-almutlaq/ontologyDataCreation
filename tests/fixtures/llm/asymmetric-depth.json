@@ -1,0 +1,429 @@
+{
+  "name": "asymmetric-depth",
+  "description": "Customer reaches depth 3, Product stops at 2, Revenue reaches 5.",
+  "entries": [
+    {
+      "label": "discovery",
+      "response": {
+        "reasoning": "Six physical tables describe three real-world things plus two financial events.",
+        "confidence": 0.85,
+        "operations": [
+          {
+            "type": "ADD_ENTITY",
+            "name": "Customer",
+            "description": "A person who buys from the store.",
+            "attributes": [
+              {
+                "name": "id",
+                "type": "integer",
+                "semanticRole": "identifier",
+                "status": "OBSERVED",
+                "confidence": 0.9,
+                "evidence": [
+                  {
+                    "locator": "customers.id",
+                    "summary": "column present in schema_overview",
+                    "status": "OBSERVED"
+                  }
+                ]
+              },
+              {
+                "name": "email",
+                "type": "text",
+                "semanticRole": "natural_key",
+                "status": "OBSERVED",
+                "confidence": 0.9,
+                "evidence": [
+                  {
+                    "locator": "customers.email",
+                    "summary": "column present in schema_overview",
+                    "status": "OBSERVED"
+                  }
+                ]
+              }
+            ],
+            "status": "OBSERVED",
+            "confidence": 0.92,
+            "evidence": [
+              {
+                "locator": "customers",
+                "summary": "present in schema_overview",
+                "status": "OBSERVED"
+              }
+            ],
+            "source": [
+              {
+                "locator": "postgres:public.customers",
+                "kind": "table"
+              }
+            ]
+          },
+          {
+            "type": "ADD_ENTITY",
+            "name": "Order",
+            "description": "A purchase committed by a customer.",
+            "attributes": [
+              {
+                "name": "id",
+                "type": "integer",
+                "semanticRole": "identifier",
+                "status": "OBSERVED",
+                "confidence": 0.9,
+                "evidence": [
+                  {
+                    "locator": "orders.id",
+                    "summary": "column present in schema_overview",
+                    "status": "OBSERVED"
+                  }
+                ]
+              },
+              {
+                "name": "customer_id",
+                "type": "integer",
+                "semanticRole": "foreign_key",
+                "status": "OBSERVED",
+                "confidence": 0.9,
+                "evidence": [
+                  {
+                    "locator": "orders.customer_id",
+                    "summary": "column present in schema_overview",
+                    "status": "OBSERVED"
+                  }
+                ]
+              },
+              {
+                "name": "status",
+                "type": "text",
+                "semanticRole": "status",
+                "status": "OBSERVED",
+                "confidence": 0.9,
+                "evidence": [
+                  {
+                    "locator": "orders.status",
+                    "summary": "column present in schema_overview",
+                    "status": "OBSERVED"
+                  }
+                ]
+              },
+              {
+                "name": "total_amount",
+                "type": "numeric",
+                "semanticRole": "amount",
+                "status": "OBSERVED",
+                "confidence": 0.9,
+                "evidence": [
+                  {
+                    "locator": "orders.total_amount",
+                    "summary": "column present in schema_overview",
+                    "status": "OBSERVED"
+                  }
+                ]
+              }
+            ],
+            "status": "OBSERVED",
+            "confidence": 0.92,
+            "evidence": [
+              {
+                "locator": "orders",
+                "summary": "present in schema_overview",
+                "status": "OBSERVED"
+              }
+            ],
+            "source": [
+              {
+                "locator": "postgres:public.orders",
+                "kind": "table"
+              }
+            ]
+          },
+          {
+            "type": "ADD_ENTITY",
+            "name": "Product",
+            "description": "An item offered for sale.",
+            "attributes": [
+              {
+                "name": "id",
+                "type": "integer",
+                "semanticRole": "identifier",
+                "status": "OBSERVED",
+                "confidence": 0.9,
+                "evidence": [
+                  {
+                    "locator": "products.id",
+                    "summary": "column present in schema_overview",
+                    "status": "OBSERVED"
+                  }
+                ]
+              },
+              {
+                "name": "sku",
+                "type": "text",
+                "semanticRole": "natural_key",
+                "status": "OBSERVED",
+                "confidence": 0.9,
+                "evidence": [
+                  {
+                    "locator": "products.sku",
+                    "summary": "column present in schema_overview",
+                    "status": "OBSERVED"
+                  }
+                ]
+              }
+            ],
+            "status": "OBSERVED",
+            "confidence": 0.92,
+            "evidence": [
+              {
+                "locator": "products",
+                "summary": "present in schema_overview",
+                "status": "OBSERVED"
+              }
+            ],
+            "source": [
+              {
+                "locator": "postgres:public.products",
+                "kind": "table"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "label": "gap-analysis",
+      "response": {
+        "gaps": [
+          {
+            "type": "UNKNOWN_RELATIONSHIP",
+            "target": "order",
+            "severity": "high",
+            "reason": "orders.customer_id is declared as a foreign key but the ontology states no relationship."
+          }
+        ]
+      }
+    },
+    {
+      "label": "depth-decision",
+      "response": {
+        "decision": "GO_DEEPER",
+        "targetDepth": 3,
+        "targetNodes": [
+          "customer",
+          "order"
+        ],
+        "reason": "A declared foreign key links orders to customers; without the relationship the ontology cannot answer who bought what.",
+        "expectedValue": 0.88,
+        "expectedInformationGain": 0.8,
+        "uncertainty": 0.45,
+        "complexityCost": 0.15,
+        "nextFocus": [
+          "orders.customer_id"
+        ],
+        "requiredEvidence": [
+          {
+            "target": "public.orders",
+            "observationType": "relationship_evidence",
+            "reason": "Confirm the declared foreign key."
+          }
+        ]
+      }
+    },
+    {
+      "label": "relationship-detection",
+      "response": {
+        "reasoning": "The foreign key is declared and value coverage is complete.",
+        "confidence": 0.93,
+        "operations": [
+          {
+            "type": "ADD_RELATIONSHIP",
+            "source": "Customer",
+            "relationship": "places",
+            "target": "Order",
+            "cardinality": "1:N",
+            "description": "A customer places orders.",
+            "status": "OBSERVED",
+            "confidence": 0.95,
+            "evidence": [
+              {
+                "locator": "orders_customer_id_fkey",
+                "summary": "declared foreign key orders.customer_id -> customers.id",
+                "status": "OBSERVED"
+              }
+            ],
+            "sourceRefs": [
+              {
+                "locator": "postgres:public.orders.customer_id",
+                "kind": "column"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "label": "gap-analysis",
+      "response": {
+        "gaps": [
+          {
+            "type": "AMBIGUOUS_CONCEPT",
+            "target": "order",
+            "severity": "high",
+            "reason": "orders.total_amount is a raw column: cancelled orders, refunds and three currencies are all unmodelled, so any revenue figure taken from it is wrong."
+          }
+        ]
+      }
+    },
+    {
+      "label": "depth-decision",
+      "response": {
+        "decision": "GO_DEEPER",
+        "targetDepth": 5,
+        "targetNodes": [
+          "order"
+        ],
+        "reason": "Revenue is not defined. total_amount mixes cancelled orders and three currencies, and refunds are recorded separately, so the business meaning must be modelled explicitly. Customer and Product are already sufficiently understood and are deliberately left alone.",
+        "expectedValue": 0.93,
+        "expectedInformationGain": 0.87,
+        "uncertainty": 0.71,
+        "complexityCost": 0.24,
+        "nextFocus": [
+          "refunds",
+          "order_status",
+          "currency"
+        ],
+        "requiredEvidence": [
+          {
+            "target": "orders.status",
+            "observationType": "value_distribution",
+            "reason": "Find out which order states exist and how much volume cancellations carry."
+          },
+          {
+            "target": "orders.currency",
+            "observationType": "value_distribution",
+            "reason": "Determine whether amounts are single-currency."
+          }
+        ]
+      }
+    },
+    {
+      "label": "concept-discovery",
+      "response": {
+        "reasoning": "Revenue is a business concept spanning orders and refunds; net revenue is the metric that makes its exclusions explicit.",
+        "confidence": 0.86,
+        "operations": [
+          {
+            "type": "ADD_CONCEPT",
+            "name": "Revenue",
+            "description": "Value earned from completed orders. Excludes cancelled orders; stated per order currency, not converted.",
+            "basedOn": [
+              "order"
+            ],
+            "status": "INFERRED",
+            "confidence": 0.84,
+            "evidence": [
+              {
+                "locator": "orders.total_amount",
+                "summary": "amount column",
+                "status": "OBSERVED"
+              },
+              {
+                "locator": "orders.status",
+                "summary": "4.8% of orders are cancelled",
+                "status": "OBSERVED"
+              },
+              {
+                "locator": "orders.currency",
+                "summary": "three currencies present, no conversion column",
+                "status": "OBSERVED"
+              }
+            ],
+            "source": [
+              {
+                "locator": "postgres:public.orders",
+                "kind": "table"
+              }
+            ]
+          },
+          {
+            "type": "ADD_METRIC",
+            "name": "Net Revenue",
+            "description": "Revenue after refunds.",
+            "definition": "sum(orders.total_amount WHERE status <> 'cancelled') - sum(refunds.amount), per currency",
+            "unit": "currency",
+            "basedOn": [
+              "revenue"
+            ],
+            "status": "DERIVED",
+            "confidence": 0.78,
+            "evidence": [
+              {
+                "locator": "refunds.amount",
+                "summary": "refunds table records 260 rows against orders",
+                "status": "OBSERVED"
+              }
+            ],
+            "source": [
+              {
+                "locator": "postgres:public.refunds",
+                "kind": "table"
+              }
+            ]
+          },
+          {
+            "type": "MARK_UNCERTAIN",
+            "target": "Net Revenue",
+            "reason": "Whether partial refunds are recorded as separate rows was never confirmed."
+          }
+        ]
+      }
+    },
+    {
+      "label": "gap-analysis",
+      "response": {
+        "gaps": []
+      }
+    },
+    {
+      "label": "depth-decision",
+      "response": {
+        "decision": "STOP",
+        "targetNodes": [],
+        "reason": "Revenue now states its exclusions and Net Revenue names its definition. Customer and Product are simple and fully grounded; modelling them further would add vocabulary, not meaning.",
+        "expectedValue": 0.12,
+        "expectedInformationGain": 0.1,
+        "uncertainty": 0.18,
+        "complexityCost": 0.55,
+        "nextFocus": [],
+        "requiredEvidence": []
+      }
+    },
+    {
+      "label": "observation-planning",
+      "fallback": true,
+      "response": {
+        "reasoning": "Fall back to inspecting the focused table.",
+        "requests": [
+          {
+            "target": "public.orders",
+            "observationType": "table_metadata",
+            "reason": "Confirm the columns in play."
+          }
+        ]
+      }
+    },
+    {
+      "label": "completion",
+      "fallback": true,
+      "response": {
+        "sufficient": true,
+        "confidence": 0.82,
+        "summary": "A retail store: customers place orders for products, orders are paid and occasionally refunded. Revenue is modelled explicitly because the raw order total does not mean what it appears to.",
+        "remainingRisks": [
+          "Net Revenue assumes one refund row per refund event; partial refunds were never confirmed.",
+          "Amounts are per-currency and are not converted, so cross-currency totals are meaningless.",
+          "Product was left at depth 2 and carries no relationship to Order."
+        ]
+      }
+    }
+  ]
+}
