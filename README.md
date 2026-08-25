@@ -15,23 +15,13 @@ Validation protects it. The depth controller decides how far to go.**
 Most schema-to-ontology tools run a fixed pipeline: dump the schema, ask a model,
 print the result. This does something different.
 
-```
-OBSERVE → DISCOVER → BUILD → VALIDATE → FIND GAPS → DECIDE DEPTH
-                                                          │
-                        ┌─────────────────┬───────────────┤
-                        ▼                 ▼               ▼
-                      STOP            REFINE          GO DEEPER
-                        │                 │               │
-                   FINALIZE         same nodes      pick a branch
-                                                          │
-                                                    plan observations
-                                                          │
-                                                       evidence
-                                                          │
-                                                        reason ──┐
-                                                                 │
-                        ◄────────────────────────────────────────┘
-```
+The loop is: **observe -> discover -> build -> validate -> find gaps -> decide
+depth**. That last step is a real decision with three outcomes:
+
+- **Stop** - finalize the ontology.
+- **Refine** - another pass over the same nodes.
+- **Go deeper** - pick a branch, plan observations against it, gather evidence,
+  reason over that evidence, and re-enter the loop.
 
 Every iteration after the first exists because the depth controller asked for
 it, targets what the controller pointed at, and ends when the controller says so
@@ -170,15 +160,12 @@ in `src/` — a test enforces this.** Prompts can be reviewed, diffed, versioned
 and swapped without touching or rebuilding the harness, and the Docker image
 copies `prompts/` into the runtime stage rather than compiling it away.
 
-```
-prompts/v1/
-├── system/       base.md, correction.md
-├── ontology/     discovery.md, entity-resolution.md,
-│                 relationship-detection.md, concept-discovery.md
-├── exploration/  depth-decision.md, observation-planning.md,
-│                 gap-analysis.md
-└── validation/   validation.md, refinement.md, completion.md
-```
+- `prompts/v1/system/` - `base.md`, `correction.md`
+- `prompts/v1/ontology/` - `discovery.md`, `entity-resolution.md`,
+  `relationship-detection.md`, `concept-discovery.md`
+- `prompts/v1/exploration/` - `depth-decision.md`, `observation-planning.md`,
+  `gap-analysis.md`
+- `prompts/v1/validation/` - `validation.md`, `refinement.md`, `completion.md`
 
 The loader returns a descriptor — name, version, sha256 — so the execution trace
 can attribute every decision to the exact prompt that produced it. Templates
@@ -259,19 +246,18 @@ exploration.
 
 ## Layout
 
-```
-src/
-├── agents/        one agent per responsibility; DepthController is the authority
-├── ontology/      Ontology, engine (atomic apply), validator, depth derivation
-├── observation/   observer interface, PostgreSQL, fixture, executor
-├── llm/           client contract, registry, providers, structured generation
-├── exploration/   state, stall detection, step controller
-├── prompts/       loader only — no prompt text
-├── schemas/       Zod (authoritative) + JSON Schema (provider hint)
-├── cli/           terminal presentation, separate from the loop
-├── trace/         append-only execution trace
-└── OntologyHarness.ts   the control loop
-```
+| Path | Contents |
+|---|---|
+| `src/agents/` | one agent per responsibility; `DepthController` is the authority |
+| `src/ontology/` | Ontology, engine (atomic apply), validator, depth derivation |
+| `src/observation/` | observer interface, PostgreSQL, fixture, executor |
+| `src/llm/` | client contract, registry, providers, structured generation |
+| `src/exploration/` | state, stall detection, step controller |
+| `src/prompts/` | loader only - no prompt text |
+| `src/schemas/` | Zod (authoritative) + JSON Schema (provider hint) |
+| `src/cli/` | terminal presentation, separate from the loop |
+| `src/trace/` | append-only execution trace |
+| `src/OntologyHarness.ts` | the control loop |
 
 ## Tests
 
